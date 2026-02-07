@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="GalgosPRO">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#0b0f1a">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <title>🏁 Galgos PRO — Analizador de Carreras</title>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <style>
+        :root {
+            --bg: #0b0f1a; --bg2: #111828; --bg3: #1a2236;
+            --bg4: #1f2a42; --gold: #f59e0b; --gold2: #fbbf24;
+            --green: #10b981; --red: #ef4444; --blue: #3b82f6;
+            --purple: #8b5cf6; --cyan: #06b6d4; --orange: #f97316;
+            --pink: #ec4899; --txt: #f1f5f9; --txt2: #94a3b8;
+            --txt3: #64748b; --brd: #2d3a52;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family:'Space Grotesk',sans-serif; background:var(--bg); color:var(--txt);
+            min-height:100vh; -webkit-tap-highlight-color:transparent;
+            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+        }
+        body::before {
+            content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+            background: radial-gradient(ellipse at 15% 50%, rgba(245,158,11,0.04) 0%, transparent 50%),
+                        radial-gradient(ellipse at 85% 30%, rgba(139,92,246,0.04) 0%, transparent 50%);
+        }
+
+        /* HEADER */
+        .hdr {
+            background:linear-gradient(135deg,#0f172a,#1e293b 60%,#0f172a);
+            border-bottom:3px solid var(--gold); padding:18px 16px; text-align:center;
+            position:sticky; top:0; z-index:100;
+        }
+        .hdr h1 {
+            font-family:'Bebas Neue',sans-serif; font-size:2.2rem; letter-spacing:4px;
+            background:linear-gradient(90deg,var(--gold),#fde68a,var(--gold));
+            -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+        }
+        .hdr p { font-size:0.85rem; color:var(--txt2); letter-spacing:1px; margin-top:2px; }
+
+        .wrap { max-width:900px; margin:0 auto; padding:14px; position:relative; z-index:1; }
+
+        /* TABS */
+        .tabs { display:flex; gap:3px; background:var(--bg2); border-radius:10px; padding:4px; border:1px solid var(--brd); margin-bottom:16px; overflow-x:auto; }
+        .tab {
+            flex:1; min-width:0; white-space:nowrap; padding:11px 6px; border:none; background:none;
+            color:var(--txt3); font-family:'Space Grotesk',sans-serif; font-size:0.82rem;
+            font-weight:600; cursor:pointer; border-radius:7px; transition:all .25s; text-align:center;
+        }
+        .tab:hover { background:var(--bg3); color:var(--txt); }
+        .tab.on { background:linear-gradient(135deg,var(--gold),var(--orange)); color:#0b0f1a; box-shadow:0 3px 12px rgba(245,158,11,0.3); }
+
+        .pane { display:none; animation:fadeUp .3s; }
+        .pane.on { display:block; }
+        @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+        /* CARD */
+        .c { background:var(--bg3); border:1px solid var(--brd); border-radius:12px; padding:18px; margin-bottom:14px; }
+        .ct { font-family:'Bebas Neue',sans-serif; font-size:1.15rem; color:var(--gold); letter-spacing:2px; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+
+        /* DOGS */
+        .d1{background:#ef4444} .d2{background:#3b82f6} .d3{background:#e2e8f0;color:#0b0f1a}
+        .d4{background:#22c55e} .d5{background:#111;border:1px solid #555} .d6{background:#f97316}
+        .d7{background:#a855f7} .d8{background:#fbbf24;color:#0b0f1a}
+        .dg {
+            display:inline-flex; align-items:center; justify-content:center;
+            width:28px; height:28px; border-radius:6px; font-family:'IBM Plex Mono',monospace;
+            font-weight:700; font-size:0.8rem; color:#fff; flex-shrink:0;
+        }
+        .dg-lg { width:44px; height:44px; font-size:1.3rem; }
+        .dg-xl { width:58px; height:58px; font-size:1.7rem; box-shadow:0 4px 20px rgba(0,0,0,.4); }
+
+        /* FORM */
+        .gr { display:grid; gap:10px; margin-bottom:14px; }
+        .gr2 { grid-template-columns:1fr 1fr; }
+        .gr3 { grid-template-columns:1fr 1fr 1fr; }
+        .gr4 { grid-template-columns:repeat(4,1fr); }
+        .gr8 { grid-template-columns:repeat(8,1fr); }
+        .fg { display:flex; flex-direction:column; gap:3px; }
+        .fg label { font-size:0.75rem; color:var(--txt2); font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
+        input,select,textarea {
+            background:var(--bg2); border:1px solid var(--brd); color:var(--txt);
+            padding:9px 10px; border-radius:7px; font-family:'IBM Plex Mono',monospace;
+            font-size:0.88rem; transition:border .2s; width:100%;
+        }
+        input:focus,select:focus,textarea:focus { outline:none; border-color:var(--gold); box-shadow:0 0 8px rgba(245,158,11,.15); }
+        textarea { resize:vertical; min-height:120px; }
+        .odds-in { text-align:center; padding:7px 4px; font-size:0.82rem; }
+
+        /* BTN */
+        .btn {
+            padding:10px 18px; border:none; border-radius:8px; font-family:'Space Grotesk',sans-serif;
+            font-weight:700; font-size:0.9rem; cursor:pointer; transition:all .25s; letter-spacing:.5px;
+        }
+        .btn:active { transform:scale(.97); }
+        .b1 { background:linear-gradient(135deg,var(--gold),var(--orange)); color:#0b0f1a; }
+        .b1:hover { box-shadow:0 4px 16px rgba(245,158,11,.4); }
+        .b2 { background:linear-gradient(135deg,var(--green),#059669); color:#fff; }
+        .b3 { background:linear-gradient(135deg,var(--blue),var(--purple)); color:#fff; }
+        .b4 { background:linear-gradient(135deg,var(--red),#dc2626); color:#fff; }
+        .bs { padding:6px 12px; font-size:0.8rem; }
+        .bg { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+
+        /* PROB BAR */
+        .pb { width:100%; height:22px; background:var(--bg2); border-radius:11px; overflow:hidden; }
+        .pf {
+            height:100%; border-radius:11px; display:flex; align-items:center; justify-content:flex-end;
+            padding-right:7px; font-family:'IBM Plex Mono',monospace; font-size:0.68rem;
+            font-weight:700; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.6); transition:width .6s;
+        }
+
+        /* PREDICTION BOX */
+        .vip {
+            background:linear-gradient(135deg,rgba(245,158,11,.08),rgba(249,115,22,.08));
+            border:2px solid var(--gold); border-radius:16px; padding:24px 18px;
+            text-align:center; position:relative; overflow:hidden;
+        }
+        .vip::before {
+            content:'⭐ PREDICCIÓN VIP ⭐'; position:absolute; top:0; left:50%; transform:translateX(-50%);
+            background:linear-gradient(90deg,var(--gold),var(--orange)); color:#0b0f1a;
+            padding:3px 18px; border-radius:0 0 8px 8px; font-family:'Bebas Neue',sans-serif;
+            font-size:0.78rem; letter-spacing:3px;
+        }
+        .vip-dogs { display:flex; gap:16px; justify-content:center; margin:22px 0 18px; flex-wrap:wrap; }
+        .vd { display:flex; flex-direction:column; align-items:center; gap:6px; }
+        .vd .dg-xl { animation:glow 2s infinite; }
+        @keyframes glow { 0%,100%{box-shadow:0 4px 20px rgba(0,0,0,.4)} 50%{box-shadow:0 4px 30px rgba(245,158,11,.5)} }
+        .vl { font-size:0.73rem; color:var(--gold); font-weight:700; letter-spacing:1px; }
+
+        /* BETS */
+        .bet-box {
+            background:var(--bg2); border-radius:12px; padding:16px; margin-top:12px;
+            border-left:4px solid var(--gold);
+        }
+        .bet-title { font-family:'Bebas Neue',sans-serif; font-size:1.1rem; letter-spacing:2px; margin-bottom:8px; }
+        .bet-row { display:flex; align-items:center; gap:8px; margin-bottom:6px; flex-wrap:wrap; }
+        .bet-label { font-size:0.78rem; color:var(--txt3); min-width:70px; text-transform:uppercase; font-weight:600; }
+        .conf { font-family:'IBM Plex Mono',monospace; font-size:0.82rem; font-weight:700; }
+        .conf-h { color:var(--green); } .conf-m { color:var(--gold); } .conf-l { color:var(--red); }
+
+        /* OCR */
+        .ocr-zone {
+            border:2px dashed var(--cyan); border-radius:14px; padding:28px 16px;
+            text-align:center; background:rgba(6,182,212,.04); cursor:pointer; transition:all .3s;
+        }
+        .ocr-zone:hover { border-color:var(--gold); background:rgba(245,158,11,.06); }
+        .ocr-icon { font-size:2.8rem; margin-bottom:8px; }
+        .preview { max-width:100%; max-height:260px; border-radius:10px; margin:12px auto; display:none; border:2px solid var(--brd); }
+        .prog-outer { width:100%; height:26px; background:var(--bg2); border-radius:13px; overflow:hidden; margin:12px 0; display:none; }
+        .prog-inner {
+            height:100%; background:linear-gradient(90deg,var(--cyan),var(--blue),var(--purple));
+            border-radius:13px; display:flex; align-items:center; justify-content:center;
+            font-family:'IBM Plex Mono',monospace; font-size:0.75rem; font-weight:700; color:#fff;
+            background-size:200% 100%; animation:shimmer 2s linear infinite; transition:width .3s;
+        }
+        @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+        /* HISTORY */
+        .hgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(42px,1fr)); gap:3px; }
+        .hcell {
+            aspect-ratio:1; display:flex; align-items:center; justify-content:center;
+            border-radius:5px; font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:0.82rem;
+        }
+
+        .streak { display:inline-flex; align-items:center; gap:3px; padding:2px 8px; border-radius:16px; font-size:0.72rem; font-weight:700; }
+        .s-hot { background:rgba(239,68,68,.15); color:var(--red); }
+        .s-cold { background:rgba(59,130,246,.15); color:var(--blue); }
+
+        .chip { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; background:var(--bg2); border:1px solid var(--brd); border-radius:16px; font-size:0.78rem; margin:2px; }
+
+        .tbl { width:100%; border-collapse:separate; border-spacing:0 3px; }
+        .tbl th { background:var(--bg2); padding:8px 10px; text-align:left; font-size:0.72rem; color:var(--gold); text-transform:uppercase; letter-spacing:1px; }
+        .tbl td { background:var(--bg4); padding:8px 10px; font-family:'IBM Plex Mono',monospace; font-size:0.82rem; }
+
+        /* FACTOR TABLE */
+        .factor-row {
+            display:flex; align-items:center; gap:10px; padding:8px 0;
+            border-bottom:1px solid rgba(45,58,82,.4);
+        }
+        .factor-name { font-size:0.82rem; color:var(--txt2); flex:1; }
+        .factor-val { font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:0.85rem; min-width:50px; text-align:right; }
+        .factor-bar { flex:2; }
+
+        .alert {
+            position:fixed; top:16px; right:16px; padding:11px 18px; border-radius:10px;
+            font-weight:600; z-index:9999; animation:slideIn .3s; max-width:330px; font-size:0.88rem;
+        }
+        .alert.ok { background:var(--green); color:#fff; }
+        .alert.err { background:var(--red); color:#fff; }
+        .alert.inf { background:var(--blue); color:#fff; }
+        @keyframes slideIn { from{transform:translateX(100%);opacity:0} to{transform:translateX(0);opacity:1} }
+
+        .disc {
+            background:rgba(239,68,68,.08); border:1px solid rgba(239,68,68,.25);
+            border-radius:10px; padding:10px 14px; font-size:0.82rem; color:var(--red);
+            margin-bottom:14px; text-align:center;
+        }
+
+        @media(max-width:600px) {
+            .hdr h1 { font-size:1.7rem; }
+            .tab { font-size:0.73rem; padding:9px 4px; }
+            .gr8 { grid-template-columns:repeat(4,1fr); }
+        }
+    </style>
+</head>
+<body>
+<div class="hdr">
+    <h1>🏁 GALGOS PRO</h1>
+    <p>Analizador Predictivo • Quiniela • Palé • Tripleta</p>
+</div>
+<div class="wrap">
+    <div class="disc">⚠️ Las carreras virtuales usan RNG. Este sistema calcula probabilidades estadísticas avanzadas pero NO garantiza resultados. Juega responsablemente.</div>
+
+    <div class="tabs">
+        <button class="tab on" data-t="cam">📸 Foto</button>
+        <button class="tab" data-t="inp">📝 Datos</button>
+        <button class="tab" data-t="pred">🎯 Predicción</button>
+        <button class="tab" data-t="anal">📊 Análisis</button>
+        <button class="tab" data-t="hist">📜 Historial</button>
+    </div>
+
+    <!-- ====== FOTO / OCR ====== -->
+    <div class="pane on" id="p-cam">
+        <div class="c">
+            <div class="ct">📸 CAPTURAR PANTALLA</div>
+            <div class="ocr-zone" id="dropZ" onclick="takePhoto()">
+                <div class="ocr-icon">📷</div>
+                <p style="color:var(--txt2);font-weight:600;">Toca para tomar foto o subir imagen</p>
+                <p style="font-size:.78rem;color:var(--txt3);margin-top:4px;">Captura la pantalla completa de carreras</p>
+            </div>
+            <input type="file" id="fileIn" accept="image/*" style="display:none" onchange="handleFile(event)">
+            <img id="prevImg" class="preview">
+            <div class="bg" style="justify-content:center;margin-top:12px;">
+                <button class="btn b1" onclick="takePhoto()" style="flex:1;max-width:200px;">📸 TOMAR FOTO</button>
+                <button class="btn b3" onclick="document.getElementById('fileIn').click()" style="flex:1;max-width:200px;">📁 Galería</button>
+            </div>
+            <div class="prog-outer" id="ocrProg"><div class="prog-inner" id="ocrBar" style="width:0%">0%</div></div>
+            <div id="ocrStat" style="text-align:center;color:var(--txt2);font-size:.85rem;margin:8px 0;"></div>
+            <div id="ocrRes" style="display:none;margin-top:14px;">
+                <div class="ct">🔍 CARRERAS DETECTADAS</div>
+                <div id="ocrList"></div>
+                <div class="bg" style="justify-content:center;">
+                    <button class="btn b2" onclick="confirmOcr()">✅ Agregar Válidas</button>
+                    <button class="btn b4 bs" onclick="clearOcr()">✕</button>
+                </div>
+                <details style="margin-top:12px;"><summary style="cursor:pointer;color:var(--txt3);font-size:.8rem;">Ver texto OCR crudo</summary>
+                <pre id="ocrRaw" style="background:var(--bg2);border:1px solid var(--brd);border-radius:7px;padding:10px;margin-top:6px;font-size:.7rem;color:var(--txt3);max-height:120px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;"></pre></details>
+            </div>
+        </div>
+        <div class="c">
+            <div class="ct">⚡ ENTRADA RÁPIDA</div>
+            <p style="font-size:.82rem;color:var(--txt2);margin-bottom:8px;">Escribe los resultados de la barra de historial:</p>
+            <textarea id="quickIn" placeholder="2617: 7, 5, 2&#10;2616: 8, 4, 3&#10;2615: 5, 8, 7"></textarea>
+            <div class="bg"><button class="btn b2" onclick="parseQuick()">📥 Procesar</button></div>
+        </div>
+    </div>
+
+    <!-- ====== DATOS / INPUT ====== -->
+    <div class="pane" id="p-inp">
+        <div class="c">
+            <div class="ct">📋 REGISTRO MANUAL</div>
+            <div class="gr gr4">
+                <div class="fg"><label>Carrera #</label><input type="number" id="rNum" placeholder="2619"></div>
+                <div class="fg"><label>🥇 1ro</label><select id="p1"><option value="">-</option><option value="1">🔴 1</option><option value="2">🔵 2</option><option value="3">⚪ 3</option><option value="4">🟢 4</option><option value="5">⚫ 5</option><option value="6">🟠 6</option><option value="7">🟣 7</option><option value="8">🟡 8</option></select></div>
+                <div class="fg"><label>🥈 2do</label><select id="p2"><option value="">-</option><option value="1">🔴 1</option><option value="2">🔵 2</option><option value="3">⚪ 3</option><option value="4">🟢 4</option><option value="5">⚫ 5</option><option value="6">🟠 6</option><option value="7">🟣 7</option><option value="8">🟡 8</option></select></div>
+                <div class="fg"><label>🥉 3ro</label><select id="p3"><option value="">-</option><option value="1">🔴 1</option><option value="2">🔵 2</option><option value="3">⚪ 3</option><option value="4">🟢 4</option><option value="5">⚫ 5</option><option value="6">🟠 6</option><option value="7">🟣 7</option><option value="8">🟡 8</option></select></div>
+            </div>
+            <div class="bg">
+                <button class="btn b2" onclick="addRace()">➕ Agregar</button>
+                <button class="btn b1 bs" onclick="loadExample()">📎 Ejemplo</button>
+            </div>
+        </div>
+        <div class="c">
+            <div class="ct">📋 PEGAR MÚLTIPLES</div>
+            <textarea id="bulkIn" placeholder="2615: 5, 8, 7&#10;2616: 8, 4, 3&#10;2617: 7, 5, 2"></textarea>
+            <div class="bg"><button class="btn b2" onclick="parseBulk()">📥 Procesar</button></div>
+        </div>
+        <div class="c">
+            <div class="ct">📜 REGISTRADAS (<span id="cnt">0</span>)</div>
+            <div id="rList"></div>
+            <div class="bg" style="margin-top:12px;">
+                <button class="btn b4 bs" onclick="clearAll()">🗑 Borrar Todo</button>
+                <button class="btn b3 bs" onclick="exportJSON()">📤 Exportar</button>
+                <button class="btn b2 bs" onclick="document.getElementById('impFile').click()">📥 Importar</button>
+                <input type="file" id="impFile" accept=".json" style="display:none" onchange="importJSON(event)">
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== PREDICCIÓN ====== -->
+    <div class="pane" id="p-pred">
+        <div class="c">
+            <div class="ct">💰 CUOTAS ACTUALES</div>
+            <p style="font-size:.82rem;color:var(--txt2);margin-bottom:10px;">Ingresa las cuotas Place para máxima precisión:</p>
+            <div class="gr gr8" id="oddsGrid"><div class="fg" style="text-align:center"><label><span class="dg d1">1</span></label><input type="number" step="0.01" id="od1" class="odds-in" placeholder="-"></div><div class="fg" style="text-align:center"><label><span class="dg d2">2</span></label><input type="number" step="0.01" id="od2" class="odds-in" placeholder="-"></div><div class="fg" style="text-align:center"><label><span class="dg d3">3</span></label><input type="number" step="0.01" id="od3" class="odds-in" placeholder="-"></div><div class="fg" style="text-align:center"><label><span class="dg d4">4</span></label><input type="number" step="0.01" id="od4" class="odds-in" placeholder="-"></div><div class="fg" style="text-align:center"><label><span class="dg d5">5</span></label><input type="number" step="0.01" id="od5" class="odds-in" placeholder="-"></div><div class="fg" style="text-align:center"><label><span class="dg d6">6</span></label><input type="number" step="0.01" id="od6" class="odds-in" placeholder="-"></div><div class="fg" style="text-align:center"><label><span class="dg d7">7</span></label><input type="number" step="0.01" id="od7" class="odds-in" placeholder="-"></div><div class="fg" style="text-align:center"><label><span class="dg d8">8</span></label><input type="number" step="0.01" id="od8" class="odds-in" placeholder="-"></div></div>
+            <div class="bg"><button class="btn b1" onclick="predict()" style="width:100%;font-size:1.05rem;padding:14px;">🎯 GENERAR PREDICCIÓN</button></div>
+        </div>
+        <div id="predOut"></div>
+    </div>
+
+    <!-- ====== ANÁLISIS ====== -->
+    <div class="pane" id="p-anal">
+        <div class="c"><div class="ct">📊 FRECUENCIA DE VICTORIAS</div><div id="wfChart"></div></div>
+        <div class="c"><div class="ct">🏅 FRECUENCIA PODIO (TOP 3)</div><div id="pfChart"></div></div>
+        <div class="c"><div class="ct">🔥 RACHAS Y TENDENCIAS</div><div id="strPanel"></div></div>
+        <div class="c"><div class="ct">🎰 TRAP BIAS (SESGO POR POSICIÓN)</div><div id="trapBias"></div></div>
+        <div class="c"><div class="ct">🔄 PATRONES EXACTA</div><div id="exPat"></div></div>
+        <div class="c"><div class="ct">📈 ESTADÍSTICAS GENERALES</div><table class="tbl" id="genStats"></table></div>
+    </div>
+
+    <!-- ====== HISTORIAL ====== -->
+    <div class="pane" id="p-hist">
+        <div class="c"><div class="ct">🗺️ MAPA DE GANADORES</div><div id="wMap"></div></div>
+        <div class="c"><div class="ct">📊 ÚLTIMAS CARRERAS</div><div id="lastT"></div></div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// DATA
+// ============================================================
+let R = JSON.parse(localStorage.getItem('galgosR')||'[]');
+let ocrParsed = [];
+let stream = null;
+const DC = {1:'#ef4444',2:'#3b82f6',3:'#cbd5e1',4:'#22c55e',5:'#374151',6:'#f97316',7:'#a855f7',8:'#fbbf24'};
+
+function save(){ localStorage.setItem('galgosR',JSON.stringify(R)); }
+function $(id){ return document.getElementById(id); }
+function dBadge(n,cls=''){return `<span class="dg ${cls} d${n}">${n}</span>`}
+
+// ============================================================
+// TABS
+// ============================================================
+document.querySelectorAll('.tab').forEach(b=>{
+    b.onclick=()=>{
+        document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+        document.querySelectorAll('.pane').forEach(p=>p.classList.remove('on'));
+        b.classList.add('on');
+        $('p-'+b.dataset.t).classList.add('on');
+        if(b.dataset.t==='anal') updateAnalysis();
+        if(b.dataset.t==='hist') updateHistory();
+    };
+});
+
+// Build odds grid
+// Odds grid rendered in static HTML
+
+// ============================================================
+// CAMERA / OCR
+// ============================================================
+function takePhoto(){
+    const inp=document.createElement('input');
+    inp.type='file'; inp.accept='image/*'; inp.capture='environment';
+    inp.style.display='none';
+    inp.onchange=e=>{ const f=e.target.files[0]; if(f) processImg(f); inp.remove(); };
+    document.body.appendChild(inp); inp.click();
+}
+function handleFile(e){ const f=e.target.files[0]; if(f) processImg(f); }
+function processImg(file){
+    const r=new FileReader();
+    r.onload=e=>{ $('prevImg').src=e.target.result; $('prevImg').style.display='block'; runOCR(e.target.result); };
+    r.readAsDataURL(file);
+}
+
+async function runOCR(data){
+    const prog=$('ocrProg'), bar=$('ocrBar'), stat=$('ocrStat');
+    prog.style.display='block'; stat.textContent='🔄 Preparando OCR...';
+    try {
+        // Preprocess: high contrast
+        const processed = await preprocess(data);
+        stat.textContent='🔍 Leyendo imagen...';
+        const res = await Tesseract.recognize(processed,'eng',{
+            logger:m=>{
+                if(m.status==='recognizing text'){
+                    const p=Math.round(m.progress*100);
+                    bar.style.width=p+'%'; bar.textContent=p+'%';
+                    stat.textContent='🔍 Leyendo... '+p+'%';
+                }
+            }
+        });
+        $('ocrRaw').textContent=res.data.text;
+        stat.textContent='✅ Procesando resultados...';
+        parseOCR(res.data.text);
+        setTimeout(()=>prog.style.display='none',1200);
+    } catch(e){
+        stat.textContent='❌ Error: '+e.message;
+        alert2('Error OCR: '+e.message,'err');
+    }
+}
+
+function preprocess(data){
+    return new Promise(res=>{
+        const img=new Image();
+        img.onload=()=>{
+            const c=document.createElement('canvas'), ctx=c.getContext('2d');
+            const s=Math.max(1,1800/Math.max(img.width,img.height));
+            c.width=img.width*s; c.height=img.height*s;
+            ctx.drawImage(img,0,0,c.width,c.height);
+            const d=ctx.getImageData(0,0,c.width,c.height).data;
+            for(let i=0;i<d.length;i+=4){
+                let g=.299*d[i]+.587*d[i+1]+.114*d[i+2];
+                g=g<128?g*.6:Math.min(255,g*1.2+30);
+                if(g<80)g=0; if(g>200)g=255;
+                d[i]=d[i+1]=d[i+2]=g;
+            }
+            ctx.putImageData(new ImageData(new Uint8ClampedArray(d),c.width,c.height),0,0);
+            res(c.toDataURL('image/png'));
+        };
+        img.src=data;
+    });
+}
+
+function parseOCR(text){
+    ocrParsed=[];
+    const clean=text.replace(/\n/g,' ').replace(/\s+/g,' ');
+    const tokens=clean.match(/\d+\.?\d*/g)||[];
+    for(let i=0;i<tokens.length;i++){
+        const t=tokens[i], n=parseInt(t);
+        if(t.length===4&&!t.includes('.')&&n>=1000&&n<=9999){
+            const pos=[];
+            let j=i+1,sk=0;
+            while(j<tokens.length&&pos.length<3&&sk<15){
+                const tt=tokens[j],nn=parseInt(tt);
+                if(tt.length===1&&nn>=1&&nn<=8&&!tt.includes('.')) pos.push(nn);
+                else if(tt.length===4&&parseInt(tt)>=1000&&!tt.includes('.')) break;
+                j++; sk++;
+            }
+            if(pos.length===3&&new Set(pos).size===3&&!ocrParsed.find(r=>r.id===String(n))){
+                ocrParsed.push({id:String(n),pos,valid:true});
+                i=j-1;
+            }
+        }
+    }
+    if(!ocrParsed.length){
+        const rx=/(\d{4})\D{0,5}(\d)\D{1,5}(\d)\D{1,5}(\d)/g;
+        let m;
+        while((m=rx.exec(clean))!==null){
+            const p=[+m[2],+m[3],+m[4]];
+            if(p.every(x=>x>=1&&x<=8)&&new Set(p).size===3&&!ocrParsed.find(r=>r.id===m[1]))
+                ocrParsed.push({id:m[1],pos:p,valid:true});
+        }
+    }
+    ocrParsed.sort((a,b)=>+a.id-+b.id);
+    showOcr();
+}
+
+function showOcr(){
+    const d=$('ocrRes'), list=$('ocrList');
+    d.style.display='block';
+    if(!ocrParsed.length){
+        list.innerHTML='<p style="text-align:center;color:var(--red);padding:16px;">😕 No se detectaron carreras — usa entrada rápida</p>';
+        return;
+    }
+    const exist=new Set(R.map(r=>r.id));
+    list.innerHTML=ocrParsed.map((r,i)=>{
+        const dup=exist.has(r.id);
+        return `<div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg2);border-radius:8px;margin-bottom:6px;border-left:3px solid ${dup?'var(--orange)':'var(--green)'}">
+            <input type="checkbox" id="oc${i}" ${!dup?'checked':''} style="width:18px;height:18px;accent-color:var(--green)">
+            <span style="font-family:'IBM Plex Mono';font-size:.8rem;color:var(--txt3);min-width:50px;">#${r.id}</span>
+            <span style="font-size:.7rem;color:var(--txt3);">1°</span>${dBadge(r.pos[0])}
+            <span style="font-size:.7rem;color:var(--txt3);">2°</span>${dBadge(r.pos[1])}
+            <span style="font-size:.7rem;color:var(--txt3);">3°</span>${dBadge(r.pos[2])}
+            ${dup?'<span style="font-size:.75rem;color:var(--orange);">duplicada</span>':''}
+        </div>`;
+    }).join('');
+    $('ocrStat').textContent=`✅ ${ocrParsed.length} carrera(s) detectada(s)`;
+}
+
+function confirmOcr(){
+    let n=0;
+    ocrParsed.forEach((r,i)=>{ if($('oc'+i)?.checked){ R.push({id:r.id,pos:r.pos,t:Date.now()}); n++; }});
+    if(n){ save(); render(); alert2(`${n} carreras agregadas`,'ok'); clearOcr(); autoNum(); }
+    else alert2('Nada seleccionado','inf');
+}
+function clearOcr(){ ocrParsed=[]; $('ocrRes').style.display='none'; $('prevImg').style.display='none'; $('ocrProg').style.display='none'; $('ocrStat').textContent=''; $('fileIn').value=''; }
+
+function parseQuick(){
+    const t=$('quickIn').value.trim(); if(!t) return alert2('Escribe resultados','err');
+    let n=parseLinesAndAdd(t);
+    if(n>0){ $('quickIn').value=''; alert2(`${n} carreras agregadas`,'ok'); autoNum(); }
+    else alert2('No se encontraron carreras válidas','err');
+}
+
+// ============================================================
+// MANUAL INPUT
+// ============================================================
+function addRace(){
+    const num=$('rNum').value, a=$('p1').value, b=$('p2').value, c=$('p3').value;
+    if(!a||!b||!c) return alert2('Selecciona las 3 posiciones','err');
+    if(a===b||a===c||b===c) return alert2('No pueden repetirse','err');
+    R.push({id:num||'R'+(R.length+1),pos:[+a,+b,+c],t:Date.now()});
+    save(); render(); alert2(`#${num||''}: ${a}-${b}-${c}`,'ok');
+    $('rNum').value=''; $('p1').value=''; $('p2').value=''; $('p3').value=''; autoNum();
+}
+
+function parseBulk(){ 
+    const t=$('bulkIn').value.trim(); if(!t) return alert2('Pega resultados','err');
+    let n=parseLinesAndAdd(t);
+    if(n>0){ alert2(`${n} carreras`,'ok'); autoNum(); } else alert2('No se encontraron válidas','err');
+}
+
+function parseLinesAndAdd(text){
+    const lines=text.split('\n').filter(l=>l.trim()); let added=0;
+    for(const line of lines){
+        const cl=line.replace(/[#\-:,|]/g,' ').replace(/\s+/g,' ').trim().split(' ');
+        let rid=null; const pos=[];
+        for(const p of cl){ const n=parseInt(p); if(isNaN(n)) continue;
+            if(p.length===4&&n>=1000&&!p.includes('.')) rid=String(n);
+            else if(n>=1&&n<=8&&p.length===1&&pos.length<3) pos.push(n);
+        }
+        if(!rid&&pos.length===3) rid='R'+(R.length+added+1);
+        if(pos.length>=3&&new Set(pos.slice(0,3)).size===3&&!R.find(r=>r.id===rid)){
+            R.push({id:rid,pos:pos.slice(0,3),t:Date.now()}); added++;
+        }
+    }
+    if(added>0){ save(); render(); } return added;
+}
+
+function loadExample(){
+    $('bulkIn').value="2610: 3, 1, 5\n2611: 8, 6, 2\n2612: 1, 4, 7\n2613: 5, 3, 8\n2614: 8, 5, 1\n2615: 2, 7, 4\n2616: 8, 4, 3\n2617: 7, 5, 2\n2618: 1, 8, 6\n2619: 4, 2, 7\n2620: 8, 3, 5\n2621: 6, 1, 4\n2622: 3, 8, 7\n2623: 5, 2, 1\n2624: 8, 7, 3";
+    alert2('Ejemplo cargado — presiona Procesar','inf');
+}
+
+function autoNum(){ if(R.length){ const n=parseInt(R[R.length-1].id); if(!isNaN(n)) $('rNum').value=n+1; }}
+
+function render(){
+    $('cnt').textContent=R.length;
+    const list=$('rList');
+    if(!R.length){ list.innerHTML='<p style="color:var(--txt3);text-align:center;padding:16px;">Sin carreras</p>'; return; }
+    list.innerHTML=R.slice(-20).reverse().map((r,i)=>`
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg2);border-radius:8px;margin-bottom:4px;">
+            <span style="font-family:'IBM Plex Mono';font-size:.75rem;color:var(--txt3);min-width:55px;">#${r.id}</span>
+            ${dBadge(r.pos[0])} ${dBadge(r.pos[1])} ${dBadge(r.pos[2])}
+            <button class="btn b4 bs" style="margin-left:auto;padding:3px 8px;font-size:.7rem;" onclick="delR(${R.length-1-i})">✕</button>
+        </div>`).join('');
+}
+function delR(i){ R.splice(i,1); save(); render(); }
+function clearAll(){ if(confirm('¿Borrar TODO?')){ R=[]; save(); render(); alert2('Borrado','inf'); }}
+
+// ============================================================
+// ★★★ MOTOR DE PREDICCIÓN MULTI-FACTOR ★★★
+// ============================================================
+function predict(){
+    if(R.length<5) return alert2('Necesitas al menos 5 carreras','err');
+    const N=R.length;
+    const odds={}; let hasOdds=false;
+    for(let i=1;i<=8;i++){ const v=parseFloat($('od'+i)?.value); if(v>0){ odds[i]=v; hasOdds=true; }}
+
+    // ===== FACTOR 1: Tasa general de victoria (15%) =====
+    const wc={}; for(let d=1;d<=8;d++) wc[d]=R.filter(r=>r.pos[0]===d).length;
+    
+    // ===== FACTOR 2: Tasa de podio (10%) =====
+    const pc={}; for(let d=1;d<=8;d++) pc[d]=R.filter(r=>r.pos.includes(d)).length;
+    
+    // ===== FACTOR 3: Forma reciente 5 carreras (20%) — más peso =====
+    const last5=R.slice(-5);
+    const f5w={}; for(let d=1;d<=8;d++) f5w[d]=last5.filter(r=>r.pos[0]===d).length;
+    const f5p={}; for(let d=1;d<=8;d++) f5p[d]=last5.filter(r=>r.pos.includes(d)).length;
+    
+    // ===== FACTOR 4: Forma reciente 10 carreras (15%) =====
+    const last10=R.slice(-10);
+    const f10w={}; for(let d=1;d<=8;d++) f10w[d]=last10.filter(r=>r.pos[0]===d).length;
+    
+    // ===== FACTOR 5: Cuotas/Odds implícitas (20% si disponible) =====
+    const oddsProb={}; 
+    if(hasOdds){ let sum=0; for(const[d,o] of Object.entries(odds)){ oddsProb[d]=1/o; sum+=1/o; }
+        for(const d in oddsProb) oddsProb[d]/=sum; // normalizar
+    }
+    
+    // ===== FACTOR 6: Trap Bias — sesgo posicional (10%) =====
+    // En galgos virtuales, cada "trap" (posición) puede tener sesgo
+    const trapWins={}; for(let d=1;d<=8;d++) trapWins[d]=wc[d]/N;
+    const expectedRate=1/8; // 12.5%
+    const trapBiasScore={}; 
+    for(let d=1;d<=8;d++) trapBiasScore[d]=trapWins[d]/expectedRate; // >1 = favorable
+    
+    // ===== FACTOR 7: Racha sin ganar — regresión a la media (5%) =====
+    const winless={}; 
+    for(let d=1;d<=8;d++){
+        let wl=0;
+        for(let i=R.length-1;i>=0;i--){ if(R[i].pos[0]===d) break; wl++; }
+        winless[d]=wl;
+    }
+    
+    // ===== FACTOR 8: Patrón de transición — ¿quién gana después de quién? (5%) =====
+    const trans={}; 
+    for(let i=1;i<R.length;i++){
+        const prev=R[i-1].pos[0], curr=R[i].pos[0];
+        const key=prev+'>'+curr;
+        trans[key]=(trans[key]||0)+1;
+    }
+    const lastWinner=R[R.length-1].pos[0];
+    const transScore={};
+    for(let d=1;d<=8;d++){
+        const k=lastWinner+'>'+d;
+        transScore[d]=(trans[k]||0)/(R.length-1);
+    }
+
+    // ===== SCORING PONDERADO =====
+    const scores={};
+    for(let d=1;d<=8;d++){
+        let s=0;
+        s += (wc[d]/N) * 15;                          // F1: Win rate general
+        s += (pc[d]/(N*3)) * 10;                       // F2: Podium rate
+        s += (f5w[d]/5) * 12 + (f5p[d]/5) * 8;        // F3: Forma 5
+        s += (f10w[d]/Math.min(10,N)) * 15;            // F4: Forma 10
+        if(hasOdds && oddsProb[d]) s += oddsProb[d]*100 * 0.20; // F5: Odds
+        else s += (wc[d]/N) * 20; // sin odds, duplicar win rate
+        s += (trapBiasScore[d]-1) * 10 + 10;           // F6: Trap bias
+        if(winless[d]>8) s += 3;                       // F7: Regresión
+        if(winless[d]>12) s += 3;
+        if(winless[d]>16) s += 2;
+        s += transScore[d] * 100 * 5 / 100;            // F8: Transición
+        scores[d]=Math.max(s, 0.1);
+    }
+
+    // Normalizar a probabilidades
+    const total=Object.values(scores).reduce((a,b)=>a+b,0);
+    const prob={}; for(let d=1;d<=8;d++) prob[d]=(scores[d]/total)*100;
+    const sorted=Object.entries(prob).sort((a,b)=>b[1]-a[1]);
+
+    const [d1,p1]=sorted[0], [d2,p2]=sorted[1], [d3,p3]=sorted[2];
+    const spread=p1-p2;
+    const [cc,cl]=spread>5?['conf-h','ALTA']:spread>2.5?['conf-m','MEDIA']:['conf-l','BAJA'];
+
+    // ===== MÚLTIPLES COMBINACIONES DE APUESTA =====
+    // Quiniela: top dog wins
+    // Palé: exacta top 2
+    // Tripleta: trifecta top 3
+    // Variantes alternativas con 2do y 3er escenario
+    
+    // Probabilidad combinada estimada
+    const pWin = (+p1/100);
+    const pExacta = pWin * (+p2/100) * 1.5; // ajuste por ser exacta
+    const pTrifecta = pExacta * (+p3/100) * 1.3;
+    
+    // ===== Factor details for transparency =====
+    const factorDetails = [
+        {name:'Win Rate General', dog:d1, val:`${(wc[d1]/N*100).toFixed(1)}%`, w:'15%'},
+        {name:'Podio Rate', dog:d1, val:`${(pc[d1]/(N*3)*100).toFixed(1)}%`, w:'10%'},
+        {name:'Forma Últ. 5', dog:d1, val:`${f5w[d1]}/5 wins`, w:'20%'},
+        {name:'Forma Últ. 10', dog:d1, val:`${f10w[d1]}/${Math.min(10,N)} wins`, w:'15%'},
+        {name:'Cuotas Implícitas', dog:d1, val:hasOdds&&odds[d1]?`@${odds[d1].toFixed(2)}`:'N/A', w:'20%'},
+        {name:'Trap Bias', dog:d1, val:`${(trapBiasScore[d1]*100).toFixed(0)}%`, w:'10%'},
+        {name:'Regresión', dog:d1, val:`${winless[d1]} sin ganar`, w:'5%'},
+        {name:'Transición', dog:d1, val:`${(transScore[d1]*100).toFixed(1)}%`, w:'5%'},
+    ];
+
+    $('predOut').innerHTML=`
+        <div class="vip">
+            <h2 style="font-family:'Bebas Neue';color:var(--gold);font-size:1.5rem;letter-spacing:3px;margin-top:18px;">PREDICCIÓN PRÓXIMA CARRERA</h2>
+            <p style="color:var(--txt2);font-size:.82rem;">Basada en ${N} carreras • ${hasOdds?'8':'0'} factores + cuotas • Confianza: <span class="${cc}">${cl}</span></p>
+            <div class="vip-dogs">
+                <div class="vd">${dBadge(d1,'dg-xl')}<span class="vl">🥇 GANADOR</span><span class="conf ${cc}">${(+p1).toFixed(1)}%</span></div>
+                <div class="vd">${dBadge(d2,'dg-lg')}<span class="vl">🥈 SEGUNDO</span><span class="conf">${(+p2).toFixed(1)}%</span></div>
+                <div class="vd">${dBadge(d3,'dg-lg')}<span class="vl">🥉 TERCERO</span><span class="conf">${(+p3).toFixed(1)}%</span></div>
+            </div>
+        </div>
+
+        <!-- APUESTAS -->
+        <div class="bet-box" style="border-left-color:var(--green);">
+            <div class="bet-title" style="color:var(--green);">🎯 QUINIELA (WIN)</div>
+            <div class="bet-row">${dBadge(d1,'dg-lg')} <span style="font-family:'Bebas Neue';font-size:1.3rem;letter-spacing:2px;">PERRO ${d1}</span></div>
+            <div class="bet-row"><span class="bet-label">Prob:</span><span class="conf ${cc}">${(+p1).toFixed(1)}%</span></div>
+            ${hasOdds&&odds[d1]?`<div class="bet-row"><span class="bet-label">Cuota:</span><span style="color:var(--cyan);font-weight:700;">@${odds[d1].toFixed(2)}</span></div>`:''}
+        </div>
+
+        <div class="bet-box" style="border-left-color:var(--gold);">
+            <div class="bet-title" style="color:var(--gold);">🎲 PALÉ (EXACTA)</div>
+            <div class="bet-row">
+                <span class="bet-label">1°→2°</span>
+                ${dBadge(d1)} <span style="font-size:1.1rem;">→</span> ${dBadge(d2)}
+                <span style="font-family:'IBM Plex Mono';font-weight:700;color:var(--gold);">${d1}-${d2}</span>
+            </div>
+            <div class="bet-row"><span class="bet-label">Alt 1:</span>${dBadge(d1)} → ${dBadge(d3)} <span style="color:var(--txt3);font-size:.8rem;">${d1}-${d3}</span></div>
+            <div class="bet-row"><span class="bet-label">Alt 2:</span>${dBadge(d2)} → ${dBadge(d1)} <span style="color:var(--txt3);font-size:.8rem;">${d2}-${d1} (invertida)</span></div>
+        </div>
+
+        <div class="bet-box" style="border-left-color:var(--purple);">
+            <div class="bet-title" style="color:var(--purple);">🏆 TRIPLETA (TRIFECTA)</div>
+            <div class="bet-row">
+                <span class="bet-label">1°→2°→3°</span>
+                ${dBadge(d1)} → ${dBadge(d2)} → ${dBadge(d3)}
+                <span style="font-family:'IBM Plex Mono';font-weight:700;color:var(--purple);">${d1}-${d2}-${d3}</span>
+            </div>
+            <div class="bet-row"><span class="bet-label">Alt 1:</span>${dBadge(d1)} → ${dBadge(d3)} → ${dBadge(d2)} <span style="color:var(--txt3);font-size:.8rem;">${d1}-${d3}-${d2}</span></div>
+            <div class="bet-row"><span class="bet-label">Alt 2:</span>${dBadge(d2)} → ${dBadge(d1)} → ${dBadge(d3)} <span style="color:var(--txt3);font-size:.8rem;">${d2}-${d1}-${d3}</span></div>
+        </div>
+
+        <div class="bet-box" style="border-left-color:var(--cyan);">
+            <div class="bet-title" style="color:var(--cyan);">📊 APUESTAS ESPECIALES</div>
+            <div class="bet-row"><span class="bet-label">Par/Impar:</span><span style="font-weight:700;color:${+d1%2===0?'var(--green)':'var(--orange)'};">${+d1%2===0?'PAR ✓':'IMPAR ✓'}</span></div>
+            <div class="bet-row"><span class="bet-label">Over/Under:</span><span style="font-weight:700;color:${+d1>4?'var(--purple)':'var(--cyan)'};">${+d1>4?'OVER (5-8)':'UNDER (1-4)'}</span></div>
+        </div>
+
+        <!-- PROBABILIDADES COMPLETAS -->
+        <div class="c">
+            <div class="ct">📊 RANKING COMPLETO</div>
+            ${sorted.map(([d,p])=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                ${dBadge(d)}<div class="pb" style="flex:1"><div class="pf" style="width:${p*100/sorted[0][1]}%;background:${DC[d]}">${(+p).toFixed(1)}%</div></div>
+            </div>`).join('')}
+        </div>
+
+        <!-- FACTORES -->
+        <div class="c">
+            <div class="ct">🔬 FACTORES DE ANÁLISIS (Perro ${d1})</div>
+            ${factorDetails.map(f=>`<div class="factor-row">
+                <span class="factor-name">${f.name}</span>
+                <span style="font-size:.72rem;color:var(--txt3);">${f.w}</span>
+                <span class="factor-val">${f.val}</span>
+            </div>`).join('')}
+        </div>
+    `;
+}
+
+// ============================================================
+// ANALYSIS
+// ============================================================
+function updateAnalysis(){
+    if(R.length<3){ $('wfChart').innerHTML='<p style="color:var(--txt3);text-align:center;">Min 3 carreras</p>'; return; }
+    const N=R.length;
+    const wc={}; const pc={}; for(let d=1;d<=8;d++){ wc[d]=R.filter(r=>r.pos[0]===d).length; pc[d]=R.filter(r=>r.pos.includes(d)).length; }
+
+    // Win freq
+    const ws=Object.entries(wc).sort((a,b)=>b[1]-a[1]); const mx=Math.max(...Object.values(wc));
+    $('wfChart').innerHTML=ws.map(([d,c])=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        ${dBadge(d)}<div class="pb" style="flex:1"><div class="pf" style="width:${mx?c/mx*100:0}%;background:${DC[d]}">${c?c+' ('+(c/N*100).toFixed(1)+'%)':''}</div></div>
+        <span style="font-family:'IBM Plex Mono';font-size:.78rem;min-width:22px;text-align:right;">${c}</span></div>`).join('');
+
+    // Podium freq
+    const ps=Object.entries(pc).sort((a,b)=>b[1]-a[1]); const mp=Math.max(...Object.values(pc));
+    $('pfChart').innerHTML=ps.map(([d,c])=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        ${dBadge(d)}<div class="pb" style="flex:1"><div class="pf" style="width:${mp?c/mp*100:0}%;background:${DC[d]}">${c?c+' ('+(c/(N*3)*100).toFixed(1)+'%)':''}</div></div></div>`).join('');
+
+    // Streaks
+    const last10=R.slice(-10);
+    const str={}; for(let d=1;d<=8;d++){
+        let wl=0; for(let i=R.length-1;i>=0;i--){ if(R[i].pos[0]===d) break; wl++; }
+        str[d]={hot:last10.filter(r=>r.pos[0]===d).length, wl};
+    }
+    $('strPanel').innerHTML=Object.entries(str).sort((a,b)=>b[1].hot-a[1].hot).map(([d,s])=>{
+        const hot=s.hot>=2, cold=s.wl>=5;
+        return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+            ${dBadge(d)} <span class="streak ${hot?'s-hot':cold?'s-cold':''}">${hot?'🔥 '+s.hot+'/10':cold?'❄️ '+s.wl+' sin ganar':s.hot+'/10'}</span>
+            <span style="font-size:.78rem;color:var(--txt3);">Última victoria: hace ${s.wl}</span></div>`;
+    }).join('');
+
+    // Trap bias
+    const expected=N/8;
+    $('trapBias').innerHTML=[1,2,3,4,5,6,7,8].map(d=>{
+        const bias=wc[d]/expected;
+        const color=bias>1.2?'var(--green)':bias<0.8?'var(--red)':'var(--txt2)';
+        return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+            ${dBadge(d)} <div class="pb" style="flex:1"><div class="pf" style="width:${Math.min(100,bias*50)}%;background:${DC[d]}">${(bias*100).toFixed(0)}%</div></div>
+            <span style="font-family:'IBM Plex Mono';font-size:.78rem;color:${color};font-weight:700;">${bias>1.2?'🔥 CALIENTE':bias<0.8?'❄️ FRÍO':'NORMAL'}</span></div>`;
+    }).join('');
+
+    // Exacta
+    const ex={}; R.forEach(r=>{ const k=r.pos[0]+'-'+r.pos[1]; ex[k]=(ex[k]||0)+1; });
+    const exs=Object.entries(ex).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    $('exPat').innerHTML=exs.length?exs.map(([c,n])=>{const[a,b]=c.split('-');return `<span class="chip">${dBadge(a)}→${dBadge(b)} <span style="font-family:'IBM Plex Mono';font-weight:700;">${n}x</span></span>`;}).join(''):'<p style="color:var(--txt3)">Sin datos</p>';
+
+    // General stats
+    const top=ws[0], least=ws[ws.length-1];
+    let maxCon=0,cur=1; for(let i=1;i<R.length;i++){ if(R[i].pos[0]===R[i-1].pos[0]){cur++;maxCon=Math.max(maxCon,cur);}else cur=1; }
+    const evenW=R.filter(r=>r.pos[0]%2===0).length, lowW=R.filter(r=>r.pos[0]<=4).length;
+    $('genStats').innerHTML=`<tr><th>Métrica</th><th>Valor</th></tr>
+        <tr><td>Total carreras</td><td>${N}</td></tr>
+        <tr><td>Más ganador</td><td>${dBadge(top[0])} → ${top[1]} (${(top[1]/N*100).toFixed(1)}%)</td></tr>
+        <tr><td>Menos ganador</td><td>${dBadge(least[0])} → ${least[1]} (${(least[1]/N*100).toFixed(1)}%)</td></tr>
+        <tr><td>Max consecutivas</td><td>${maxCon||'-'}</td></tr>
+        <tr><td>Par vs Impar</td><td>Par: ${evenW} (${(evenW/N*100).toFixed(1)}%) | Impar: ${N-evenW} (${((N-evenW)/N*100).toFixed(1)}%)</td></tr>
+        <tr><td>Under(1-4) vs Over(5-8)</td><td>Under: ${lowW} (${(lowW/N*100).toFixed(1)}%) | Over: ${N-lowW} (${((N-lowW)/N*100).toFixed(1)}%)</td></tr>`;
+}
+
+// ============================================================
+// HISTORY
+// ============================================================
+function updateHistory(){
+    if(!R.length){ $('wMap').innerHTML='<p style="color:var(--txt3);text-align:center">Sin datos</p>'; $('lastT').innerHTML=''; return; }
+    const last50=R.slice(-50);
+    $('wMap').innerHTML=`<div class="hgrid">${last50.map(r=>`<div class="hcell d${r.pos[0]}" title="#${r.id}: ${r.pos.join('-')}">${r.pos[0]}</div>`).join('')}</div>
+        <p style="font-size:.72rem;color:var(--txt3);margin-top:6px;text-align:center;">Últimas ${last50.length} carreras</p>`;
+    const last15=R.slice(-15).reverse();
+    $('lastT').innerHTML=`<table class="tbl"><tr><th>#</th><th>🥇</th><th>🥈</th><th>🥉</th><th>Exacta</th></tr>
+        ${last15.map(r=>`<tr><td>${r.id}</td><td>${dBadge(r.pos[0])}</td><td>${dBadge(r.pos[1])}</td><td>${dBadge(r.pos[2])}</td><td>${r.pos.join('-')}</td></tr>`).join('')}</table>`;
+}
+
+// ============================================================
+// EXPORT/IMPORT
+// ============================================================
+function exportJSON(){
+    const b=new Blob([JSON.stringify(R,null,2)],{type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(b);
+    a.download=`galgos_${new Date().toISOString().slice(0,10)}.json`; a.click();
+}
+function importJSON(e){
+    const f=e.target.files[0]; if(!f) return;
+    const r=new FileReader();
+    r.onload=ev=>{ try{ const d=JSON.parse(ev.target.result); if(Array.isArray(d)){ R=[...R,...d]; save(); render(); alert2(`${d.length} importadas`,'ok'); }}catch{alert2('Archivo inválido','err');}};
+    r.readAsText(f);
+}
+
+// ============================================================
+// UTILS
+// ============================================================
+function alert2(msg,type){
+    const a=document.createElement('div'); a.className=`alert ${type}`; a.textContent=msg;
+    document.body.appendChild(a);
+    setTimeout(()=>{a.style.opacity='0';a.style.transform='translateX(100%)';a.style.transition='all .3s';setTimeout(()=>a.remove(),300);},3000);
+}
+
+// Helper for select options (rendered by template literal in HTML)
+function dogOpts(){ return [1,2,3,4,5,6,7,8].map(i=>`<option value="${i}">${['🔴','🔵','⚪','🟢','⚫','🟠','🟣','🟡'][i-1]} ${i}</option>`).join(''); }
+
+// PWA
+if('serviceWorker' in navigator) window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+
+// iOS install hint
+const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
+if(isIOS&&!window.navigator.standalone&&!localStorage.getItem('iosD')){
+    setTimeout(()=>{
+        const b=document.createElement('div');
+        b.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:9999;background:linear-gradient(135deg,#1a2236,#16213e);border-top:2px solid var(--cyan);padding:14px 18px;text-align:center;padding-bottom:calc(14px + env(safe-area-inset-bottom));animation:slideIn .4s;';
+        b.innerHTML=`<div style="color:var(--cyan);font-family:Bebas Neue;font-size:.85rem;letter-spacing:2px;">📲 INSTALAR APP</div>
+            <div style="color:var(--txt2);font-size:.8rem;">Toca ⎋ (compartir) → "Agregar a pantalla de inicio"</div>
+            <button onclick="this.parentElement.remove();localStorage.setItem('iosD','1')" style="background:none;border:1px solid var(--txt3);color:var(--txt2);padding:5px 14px;border-radius:6px;margin-top:8px;font-size:.78rem;cursor:pointer;">OK</button>`;
+        document.body.appendChild(b);
+    },3000);
+}
+
+render(); autoNum();
+</script>
+</body>
+</html>
